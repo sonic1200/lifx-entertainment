@@ -12,6 +12,7 @@ import asyncio
 import logging
 import random
 import socket
+import sys
 from collections.abc import Callable
 from contextlib import suppress
 from dataclasses import dataclass, field
@@ -23,6 +24,8 @@ LOGGER = logging.getLogger(__name__)
 
 DEFAULT_TIMEOUT_S = 0.5
 DEFAULT_RETRIES = 3
+# WSAIoctl control code (not exposed by the socket module).
+_SIO_UDP_CONNRESET = 0x9800000C
 
 # Called for every received packet: (header, payload, (host, port)).
 PacketListener = Callable[[Header, bytes, tuple[str, int]], None]
@@ -37,6 +40,44 @@ class _PendingRequest:
     # Number of replies to collect before resolving (multi-packet responses).
     expected: int = 1
     replies: list[tuple[Header, bytes]] = field(default_factory=list)
+
+
+def _disable_udp_connreset(sock: socket.socket) -> None:
+    """
+    Stop Windows from reporting ICMP "port unreachable" as an error on a UDP socket.
+
+    Probing an address with no light behind it otherwise makes the next receive fail,
+    and asyncio's proactor loop then stops reading from the socket altogether.
+    """
+    import ctypes  # noqa: PLC0415
+    from ctypes import wintypes  # noqa: PLC0415
+
+    ws2_32 = ctypes.WinDLL("ws2_32")  # type: ignore[attr-defined]
+    ws2_32.WSAIoctl.argtypes = [
+        ctypes.c_size_t,
+        wintypes.DWORD,
+        ctypes.c_void_p,
+        wintypes.DWORD,
+        ctypes.c_void_p,
+        wintypes.DWORD,
+        ctypes.POINTER(wintypes.DWORD),
+        ctypes.c_void_p,
+        ctypes.c_void_p,
+    ]
+    enabled = wintypes.BOOL(False)  # noqa: FBT003
+    returned = wintypes.DWORD()
+    if ws2_32.WSAIoctl(
+        sock.fileno(),
+        _SIO_UDP_CONNRESET,
+        ctypes.byref(enabled),
+        ctypes.sizeof(enabled),
+        None,
+        0,
+        ctypes.byref(returned),
+        None,
+        None,
+    ):
+        LOGGER.debug("Could not disable SIO_UDP_CONNRESET on the LIFX socket")
 
 
 class _Protocol(asyncio.DatagramProtocol):
@@ -84,6 +125,8 @@ class LifxTransport:
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
         sock.setblocking(False)  # noqa: FBT003
+        if sys.platform == "win32":
+            _disable_udp_connreset(sock)
         sock.bind(local_addr)
         loop = asyncio.get_running_loop()
         transport, _ = await loop.create_datagram_endpoint(lambda: _Protocol(self), sock=sock)

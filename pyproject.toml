@@ -13,6 +13,7 @@ classifiers = [
 # Pure asyncio + stdlib: the LIFX LAN protocol is plain UDP, no crypto or bridge needed.
 dependencies = []
 description = "Async Python client for streaming music-reactive colours to LIFX lights over the LAN protocol."
+authors = [{name = "Nicolas Mivielle"}]
 license = {text = "Apache-2.0"}
 name = "lifx-entertainment"
 readme = "README.md"
@@ -32,8 +33,8 @@ test = [
 ]
 
 [project.urls]
-"Bug Reports" = "https://github.com/OWNER/lifx-entertainment/issues"
-"Source Code" = "https://github.com/OWNER/lifx-entertainment"
+"Bug Reports" = "https://github.com/sonic1200/lifx-entertainment/issues"
+"Source Code" = "https://github.com/sonic1200/lifx-entertainment"
 
 [tool.setuptools]
 include-package-data = true
