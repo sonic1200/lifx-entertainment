@@ -1,0 +1,14 @@
+{
+  "type": "plugin",
+  "stage": "experimental",
+  "domain": "lifx_entertainment",
+  "name": "LIFX Lights Sync",
+  "description": "Sync LIFX lights to music over the LAN protocol.",
+  "codeowners": ["@nicol"],
+  "depends_on": "sendspin",
+  "requirements": [],
+  "documentation": "https://github.com/OWNER/lifx-entertainment",
+  "multi_instance": true,
+  "builtin": false,
+  "icon": "lightbulb-group"
+}
