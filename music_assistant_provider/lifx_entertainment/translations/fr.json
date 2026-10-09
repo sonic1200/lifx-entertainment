@@ -1,0 +1,69 @@
+{
+  "config_entries": {
+    "discover_intro": {
+      "label": "Music Assistant va rechercher les lumières LIFX sur votre réseau. Vérifiez qu'elles sont alimentées (elles peuvent être éteintes dans l'application) et sur le même réseau que Music Assistant."
+    },
+    "broadcast_address": {
+      "label": "Adresse de broadcast",
+      "description": "Adresse à laquelle la recherche est envoyée. Gardez 255.255.255.255 sauf si vos lumières ne sont pas trouvées ; essayez alors l'adresse de broadcast de votre sous-réseau (par ex. 192.168.1.255)."
+    },
+    "extra_hosts": {
+      "label": "Adresses IP supplémentaires",
+      "description": "Adresses IP (séparées par des virgules) de lumières LIFX à interroger directement, pour les réseaux qui bloquent le broadcast."
+    },
+    "lights": {
+      "label": "Lumières",
+      "description": "Les lumières LIFX qui doivent réagir à la musique."
+    },
+    "grouping": {
+      "label": "Lecteurs lumière",
+      "description": "Comment les lumières sélectionnées sont regroupées en lecteurs lumière Music Assistant.",
+      "options": {
+        "group": "Un lecteur par groupe LIFX (pièces de l'application LIFX)",
+        "all": "Un seul lecteur avec toutes les lumières",
+        "light": "Un lecteur par lumière"
+      }
+    },
+    "brightness": {
+      "label": "Luminosité",
+      "description": "Luminosité globale des lumières (0-100)."
+    },
+    "color_mode": {
+      "label": "Mode",
+      "description": "Style de visualisation. Smooth (par défaut) : luminosité pilotée par le spectre avec une palette qui dérive lentement. Ambient : cycle de couleurs uniquement, sans variation de luminosité. Flashing : pulsation à chaque temps, plus forte sur le premier temps. Energetic : fortes variations de luminosité sur les frappes et rotation rapide de la palette."
+    },
+    "light_latency_ms": {
+      "label": "Latence des lumières (ms)",
+      "description": "Avance (en millisecondes) avec laquelle les couleurs sont envoyées, pour compenser le délai du Wi-Fi et des ampoules. Augmentez si les lumières sont en retard sur la musique, diminuez si elles sont en avance."
+    },
+    "transition_ms": {
+      "label": "Transition (ms)",
+      "description": "Durée du fondu des ampoules vers chaque nouvelle couleur. Plus haut est plus doux, plus bas est plus nerveux."
+    },
+    "power_on": {
+      "label": "Allumer les lumières éteintes",
+      "description": "Allume les lumières éteintes pendant la musique. Chaque lumière revient à son état précédent (couleur et alimentation) quand la musique s'arrête."
+    }
+  },
+  "setup_flow": {
+    "user": {
+      "title": "Trouver vos lumières LIFX",
+      "description": "Music Assistant va rechercher les lumières LIFX sur votre réseau."
+    },
+    "discovering": {
+      "title": "Recherche des lumières LIFX",
+      "progress_text": "Recherche des lumières LIFX sur le réseau..."
+    },
+    "select_lights": {
+      "title": "Choisir vos lumières",
+      "description": "{0} lumière(s) LIFX trouvée(s). Choisissez les lumières qui doivent réagir à la musique et comment les regrouper."
+    }
+  },
+  "manifest": {
+    "description": "Synchronise les lumières LIFX avec la musique via le protocole LAN."
+  },
+  "errors": {
+    "no_lights_found": "Aucune lumière LIFX trouvée. Vérifiez qu'elles sont alimentées et sur le même réseau, ou saisissez leurs adresses IP.",
+    "no_lights_selected": "Sélectionnez au moins une lumière."
+  }
+}

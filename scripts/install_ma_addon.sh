@@ -6,7 +6,7 @@
 #
 #   mkdir -p /config/lifx-entertainment
 #   curl -fsSL -o /config/lifx-entertainment/install_ma_addon.sh \
-#     https://raw.githubusercontent.com/OWNER/lifx-entertainment/main/scripts/install_ma_addon.sh
+#     https://raw.githubusercontent.com/sonic1200/lifx-entertainment/main/scripts/install_ma_addon.sh
 #   sh /config/lifx-entertainment/install_ma_addon.sh
 #
 # Options (environment variables):
@@ -28,7 +28,7 @@ set -eu
 MODE="${1:-install}"
 WATCH_INTERVAL="${WATCH_INTERVAL:-60}"
 
-LIFX_REPO="${LIFX_REPO:-OWNER/lifx-entertainment}"
+LIFX_REPO="${LIFX_REPO:-sonic1200/lifx-entertainment}"
 LIFX_REF="${LIFX_REF:-main}"
 ARCHIVE="https://github.com/${LIFX_REPO}/archive/${LIFX_REF}.tar.gz"
 
@@ -83,6 +83,7 @@ docker exec "${MA_CONTAINER}" sh -c \
 # 2. The provider, into Music Assistant's providers directory.
 docker exec -i "${MA_CONTAINER}" /app/venv/bin/python - "${ARCHIVE}" <<'PY'
 import io
+import json
 import shutil
 import sys
 import sysconfig
@@ -115,6 +116,34 @@ with tarfile.open(fileobj=io.BytesIO(data), mode="r:gz") as tar:
 if not (dest / "manifest.json").exists():
     sys.exit(f"Provider files not found in {archive}")
 print(f"Installed {count} provider files to {dest}")
+
+# Music Assistant only reads the compiled translations/<lang>.json files at runtime (the
+# per-provider strings.json is merged into them at build time), so merge ours in.
+prefix = "provider.lifx_entertainment."
+
+
+def flatten(node, key_prefix, out):
+    for key, value in node.items():
+        if isinstance(value, dict):
+            flatten(value, f"{key_prefix}{key}.", out)
+        elif isinstance(value, str):
+            out[f"{key_prefix}{key}"] = value
+    return out
+
+
+translations = dest.parent.parent / "translations"
+sources = {"en": dest / "strings.json"}
+sources.update({p.stem: p for p in sorted((dest / "translations").glob("*.json"))})
+for lang, source in sources.items():
+    target = translations / f"{lang}.json"
+    if lang != "en" and not target.exists():
+        continue
+    catalog = json.loads(target.read_text(encoding="utf-8")) if target.exists() else {}
+    catalog = {k: v for k, v in catalog.items() if not k.startswith(prefix)}
+    added = flatten(json.loads(source.read_text(encoding="utf-8")), prefix, {})
+    catalog.update(added)
+    target.write_text(json.dumps(catalog, ensure_ascii=False, indent=2), encoding="utf-8")
+    print(f"Merged {len(added)} strings into {target}")
 PY
 
 echo "Restarting ${MA_CONTAINER}..."

@@ -174,3 +174,11 @@ async def test_cancelled_start_still_restores(transport, bulb):
     assert not session.is_streaming
     await session.stop()
     assert bulb.power == 0
+
+
+async def test_unreachable_probe_keeps_socket_alive(transport, bulb):
+    # Windows turns an ICMP "port unreachable" into a reset that used to stop receiving.
+    for _ in range(3):
+        transport.send("127.0.0.1", MessageType.GET_SERVICE, port=9)
+    await asyncio.sleep(0.1)
+    assert await LifxLanAPI(transport).get_label(_device(bulb)) == "Bulb"

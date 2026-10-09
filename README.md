@@ -60,12 +60,13 @@ Assistant container. Tested with Music Assistant **2.10.6**.
    ```sh
    mkdir -p /config/lifx-entertainment
    curl -fsSL -o /config/lifx-entertainment/install_ma_addon.sh \
-     https://raw.githubusercontent.com/OWNER/lifx-entertainment/main/scripts/install_ma_addon.sh
+     https://raw.githubusercontent.com/sonic1200/lifx-entertainment/main/scripts/install_ma_addon.sh
    sh /config/lifx-entertainment/install_ma_addon.sh
    ```
 
    The script installs the library into Music Assistant's virtualenv, copies the provider
-   into `music_assistant/providers/lifx_entertainment` and restarts Music Assistant.
+   into `music_assistant/providers/lifx_entertainment`, merges its strings (English and
+   French) into Music Assistant's translation files and restarts Music Assistant.
 3. In Music Assistant: **Settings → Plugins → Add plugin → LIFX Lights Sync**, then pick the
    lights and the grouping.
 
@@ -110,7 +111,10 @@ pytest tests
 ruff check . && mypy lifx_entertainment
 ```
 
-The tests use a fake LIFX device on localhost; no real lights are needed.
+The tests use a fake LIFX device on localhost; no real lights are needed. When the Music
+Assistant server package (`music-assistant @ git+https://github.com/music-assistant/server.git@2.10.6`)
+is installed in the same environment, `tests/ma/` also runs the provider against the real
+setup flow engine, Sendspin server and visualizer pipeline; otherwise those tests are skipped.
 
 ## License
 

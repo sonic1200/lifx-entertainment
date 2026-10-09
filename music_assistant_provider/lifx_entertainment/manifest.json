@@ -4,10 +4,10 @@
   "domain": "lifx_entertainment",
   "name": "LIFX Lights Sync",
   "description": "Sync LIFX lights to music over the LAN protocol.",
-  "codeowners": ["@nicol"],
+  "codeowners": ["@sonic1200"],
   "depends_on": "sendspin",
   "requirements": [],
-  "documentation": "https://github.com/OWNER/lifx-entertainment",
+  "documentation": "https://github.com/sonic1200/lifx-entertainment",
   "multi_instance": true,
   "builtin": false,
   "icon": "lightbulb-group"
