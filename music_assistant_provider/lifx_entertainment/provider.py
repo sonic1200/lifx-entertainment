@@ -1,10 +1,4 @@
-"""
-LIFX Lights Sync provider for Music Assistant.
-
-Builds light players (one per LIFX group by default) from the LIFX devices picked in
-the setup flow and creates a virtual Sendspin player for each. When music plays to a
-virtual player, the lights in that area react to the music.
-"""
+"""LIFX Lights Sync provider for Music Assistant."""
 
 from __future__ import annotations
 
@@ -97,12 +91,7 @@ class LifxEntertainmentProvider(PluginProvider):
         self._rediscovery_task: asyncio.Task[None] | None = None
 
     async def get_config_entries(self) -> tuple[ConfigEntry, ...]:
-        """
-        Return the (options) config entries for the LIFX Lights Sync provider.
-
-        Light discovery and selection run in the interactive setup flow (see
-        ``setup_flow.py``); only the playback/visualization settings are configured here.
-        """
+        """Return the playback settings; lights are picked in the setup flow."""
         return (
             ConfigEntry(
                 key=CONF_BRIGHTNESS,
@@ -150,8 +139,7 @@ class LifxEntertainmentProvider(PluginProvider):
 
     async def loaded_in_mass(self) -> None:
         """Open the LAN transport, refresh the devices and set up a bridge per area."""
-        # Migrate orphaned color_mode values from older versions to the default
-        # so the settings dropdown shows a valid option.
+        # Reset a color mode that no longer exists, so the dropdown shows a valid option.
         stored_mode = self.config.get_value(CONF_COLOR_MODE)
         if stored_mode is not None and str(stored_mode) not in COLOR_MODES:
             self._update_config_value(CONF_COLOR_MODE, DEFAULT_COLOR_MODE)
@@ -202,15 +190,7 @@ class LifxEntertainmentProvider(PluginProvider):
         self._api = None
 
     async def update_config(self, config: ProviderConfig, changed_keys: set[str]) -> None:
-        """
-        Handle config changes.
-
-        Playback settings like brightness/color_mode can be updated
-        without a full provider reload.
-        """
-        # changed_keys arrive namespaced as 'values/<key>'; only skip the reload when
-        # every changed key can be applied in place (anything else, including the
-        # log level, still needs the base implementation).
+        """Apply playback settings in place; reload for anything else."""
         settings_keys = {f"values/{key}" for key in _LIVE_SETTINGS}
         if changed_keys and changed_keys <= settings_keys and self._bridge_manager:
             self._bridge_manager.update_settings(
@@ -235,12 +215,7 @@ class LifxEntertainmentProvider(PluginProvider):
                 self.logger.debug("LIFX rediscovery failed: %s", err)
 
     async def _rediscover(self) -> None:
-        """
-        Update the configured devices' addresses (and zone layout) from a discovery.
-
-        Devices are updated in place, so running bridges/sessions pick up a new IP on
-        their next frame. Devices that do not answer keep their last known address.
-        """
+        """Update the configured devices in place, so running sessions follow IP changes."""
         if self._transport is None:
             return
         broadcast = str(self.get_setup_value(CONF_BROADCAST) or DEFAULT_BROADCAST)
@@ -263,9 +238,8 @@ class LifxEntertainmentProvider(PluginProvider):
                 changed = True
             if device.label:
                 current.label = device.label
-            # The zone layout defines the bridges' channels, so it is only refreshed
-            # before they are built (i.e. on load), never under a running bridge. A failed
-            # zone probe reads as "no zones", so only a positive probe is trusted.
+            # Zones define the bridges' channels, so only refresh them before the bridges
+            # exist. A failed probe reads as "no zones", so only trust a positive one.
             if (
                 self._bridge_manager is None
                 and device.is_multizone

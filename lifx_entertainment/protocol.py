@@ -1,10 +1,4 @@
-"""
-Encoder/decoder for the LIFX LAN protocol.
-
-Every message is a 36-byte little-endian header (frame, frame address, protocol header)
-followed by a type-specific payload. Only the messages needed for discovery, state
-snapshots and colour streaming are implemented.
-"""
+"""Encoder/decoder for the LIFX LAN messages needed for discovery, snapshots and streaming."""
 
 from __future__ import annotations
 
@@ -67,13 +61,8 @@ def encode_message(
     """
     Build a complete LIFX packet.
 
-    :param msg_type: Message type number (see :class:`MessageType`).
-    :param payload: The already encoded payload.
-    :param source: Client identifier; replies are unicast back when it is not 0 or 1.
-    :param sequence: Wrap-around sequence number (0-255) used to match replies.
-    :param target: 8-byte device target; all zeroes addresses every device (tagged).
-    :param res_required: Ask the device to reply with a State message.
-    :param ack_required: Ask the device to reply with an Acknowledgement.
+    :param source: Client identifier; devices broadcast their replies when it is 0 or 1.
+    :param target: 8-byte device target; all zeroes addresses every device.
     """
     tagged = target == BROADCAST_TARGET
     protocol = PROTOCOL_NUMBER | _ADDRESSABLE | (_TAGGED if tagged else 0)
@@ -96,11 +85,7 @@ def encode_message(
 
 
 def decode_header(data: bytes) -> Header:
-    """
-    Decode the header of a received packet.
-
-    :param data: The raw datagram.
-    """
+    """Decode the header of a received packet."""
     if len(data) < HEADER_SIZE:
         msg = f"LIFX packet too short ({len(data)} bytes)"
         raise ValueError(msg)
@@ -164,14 +149,7 @@ def get_color_zones(start_index: int = 0, end_index: int = 255) -> bytes:
 def set_extended_color_zones(
     colors: list[HSBK], duration_ms: int, zone_index: int = 0, apply: ZoneApply = ZoneApply.APPLY
 ) -> bytes:
-    """
-    Payload for SetExtendedColorZones (510).
-
-    :param colors: Up to 82 zone colours starting at ``zone_index``.
-    :param duration_ms: Transition time.
-    :param zone_index: First zone the colours apply to.
-    :param apply: Apply mode.
-    """
+    """Payload for SetExtendedColorZones (510)."""
     count = min(len(colors), EXTENDED_ZONES_PER_MESSAGE)
     padded = list(colors[:count]) + [HSBK()] * (EXTENDED_ZONES_PER_MESSAGE - count)
     return struct.pack("<IBHB", max(0, duration_ms), int(apply), zone_index & 0xFFFF, count) + (
@@ -254,11 +232,6 @@ def rgb16_to_hsbk(red: int, green: int, blue: int, kelvin: int = DEFAULT_KELVIN)
 
     Brightness carries the RGB value (max channel), so a dimmed RGB colour becomes a
     dimmed LIFX colour with the same hue and saturation.
-
-    :param red: Red channel (0-65535).
-    :param green: Green channel (0-65535).
-    :param blue: Blue channel (0-65535).
-    :param kelvin: White point used for low-saturation colours.
     """
     r = max(0, min(65535, red)) / 65535.0
     g = max(0, min(65535, green)) / 65535.0

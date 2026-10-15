@@ -30,14 +30,7 @@ def build_areas(
     all_name: str = "All lights",
     max_segments: int = DEFAULT_MAX_SEGMENTS,
 ) -> list[EntertainmentArea]:
-    """
-    Combine devices into entertainment areas.
-
-    :param devices: The devices to include.
-    :param grouping: How to combine devices into areas.
-    :param all_name: Area name used for :attr:`Grouping.ALL`.
-    :param max_segments: Maximum number of channels a multizone strip is split into.
-    """
+    """Combine devices into entertainment areas."""
     grouping = Grouping(grouping)
     ordered = sorted(devices, key=lambda d: (d.label.lower(), d.serial))
     buckets: dict[str, tuple[str, list[LifxDevice]]] = {}
@@ -70,9 +63,6 @@ def build_channels(
 
     Channels are laid out left to right along the x axis in device order, which gives the
     analyzer a spatial axis to spread its colour gradient over.
-
-    :param devices: Devices in display order.
-    :param max_segments: Maximum number of channels a multizone strip is split into.
     """
     specs: list[tuple[LifxDevice, int, int, str]] = []
     for device in devices:
@@ -103,10 +93,5 @@ def build_channels(
 
 
 def area_client_id(area_id: str, namespace: str = "") -> str:
-    """
-    Return a short stable identifier for an area (e.g. for a player id).
-
-    :param area_id: The area id.
-    :param namespace: Extra input (e.g. a provider instance id) to keep ids unique.
-    """
+    """Return a short stable identifier for an area (e.g. for a player id)."""
     return hashlib.sha1(f"{namespace}:{area_id}".encode(), usedforsecurity=False).hexdigest()[:16]

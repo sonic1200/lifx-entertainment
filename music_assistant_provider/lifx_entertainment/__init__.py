@@ -1,13 +1,4 @@
-"""
-LIFX Lights Sync Plugin for Music Assistant.
-
-Syncs LIFX lights to music using the Sendspin visualization pipeline and the
-LIFX LAN protocol (UDP, no cloud and no bridge).
-
-Each LIFX group (room in the LIFX app) appears as a virtual light player in
-Music Assistant. Joining that player to a playing group makes the lights react
-to the music in real time.
-"""
+"""LIFX Lights Sync plugin: sync LIFX lights to music over the LAN protocol."""
 
 from __future__ import annotations
 
@@ -35,6 +26,4 @@ async def setup(
     """Initialize provider(instance) with given configuration."""
     from .provider import LifxEntertainmentProvider  # noqa: PLC0415
 
-    # device selection is handled by the setup flow; a provider that somehow lacks
-    # devices degrades to unavailable in loaded_in_mass rather than failing here.
     return LifxEntertainmentProvider(mass, manifest, config, SUPPORTED_FEATURES)
