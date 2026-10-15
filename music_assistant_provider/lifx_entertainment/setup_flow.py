@@ -1,10 +1,8 @@
 """
 Setup flow for the LIFX Lights Sync provider.
 
-LIFX lights need no pairing: Music Assistant broadcasts on the LAN, lists the lights
-that answered and lets the user pick which ones to use and how to group them into
-light players. The selected devices (with their last known IP and zone layout) are
-stored as setup data so the provider can reach them even if a broadcast is missed.
+The picked devices are stored with their last known IP, so they stay reachable when a
+broadcast is missed.
 """
 
 from __future__ import annotations
@@ -40,11 +38,7 @@ _DISCOVERY_STEP_TIMEOUT = DISCOVERY_TIMEOUT_S + 12.0
 
 
 async def run_setup(session: SetupSession) -> None:
-    """
-    Run the LIFX discovery + light selection flow.
-
-    :param session: The setup session driving the flow.
-    """
+    """Run the LIFX discovery + light selection flow."""
     setup_data = session.context.setup_data
     broadcast_default = str(setup_data.get(CONF_BROADCAST) or DEFAULT_BROADCAST)
     hosts_default = str(setup_data.get(CONF_EXTRA_HOSTS) or "")
@@ -142,11 +136,7 @@ async def run_setup(session: SetupSession) -> None:
 
 
 def parse_devices(raw: object) -> list[LifxDevice]:
-    """
-    Parse the devices stored as setup data (best effort).
-
-    :param raw: The stored JSON string.
-    """
+    """Parse the devices stored as setup data (best effort)."""
     if not raw:
         return []
     try:
@@ -156,11 +146,7 @@ def parse_devices(raw: object) -> list[LifxDevice]:
 
 
 def parse_hosts(raw: object) -> list[str]:
-    """
-    Parse a comma/space separated list of IP addresses.
-
-    :param raw: The user input.
-    """
+    """Parse a comma/space separated list of IP addresses."""
     if not raw:
         return []
     return [h for h in str(raw).replace(",", " ").split() if h]

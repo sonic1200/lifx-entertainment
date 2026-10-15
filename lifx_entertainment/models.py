@@ -67,11 +67,7 @@ class LifxDevice:
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> LifxDevice:
-        """
-        Deserialize a dict produced by :meth:`to_dict`.
-
-        :param data: The serialized device.
-        """
+        """Deserialize a dict produced by :meth:`to_dict`."""
         return cls(
             serial=str(data["serial"]),
             host=str(data["host"]),
@@ -117,9 +113,9 @@ class LightColorCommand:
     """A color command for a single light channel (16-bit RGB)."""
 
     channel_id: int
-    red: int = 0  # 0-65535
-    green: int = 0  # 0-65535
-    blue: int = 0  # 0-65535
+    red: int = 0
+    green: int = 0
+    blue: int = 0
 
 
 @dataclass(frozen=True, slots=True)

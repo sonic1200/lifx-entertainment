@@ -29,15 +29,11 @@ async def discover_devices(
     port: int = LIFX_PORT,
 ) -> list[LifxDevice]:
     """
-    Find LIFX devices on the network.
+    Find LIFX devices on the network, sorted by label.
 
     :param transport: Opened transport to use; a temporary one is created when omitted.
-    :param timeout: Seconds to listen for replies.
-    :param broadcast: Broadcast address to send GetService to (e.g. ``192.168.1.255``).
-    :param hosts: Extra device IPs to probe directly (for networks that drop broadcasts).
-    :param details: Also fetch label, group, product and zone layout for every device.
-    :param port: UDP port the devices listen on.
-    :return: The discovered devices, sorted by label.
+    :param hosts: Device IPs to probe directly, for networks that drop broadcasts.
+    :param details: Also fetch label, group, product and zone layout of every device.
     """
     own_transport = transport is None
     if transport is None:
@@ -86,13 +82,7 @@ async def discover_devices(
 
 
 async def refresh_device(api: LifxLanAPI, device: LifxDevice) -> bool:
-    """
-    Fetch label, group, product and zone layout for a device (best effort).
-
-    :param api: API bound to an opened transport.
-    :param device: The device to update in place.
-    :return: True when the device answered.
-    """
+    """Fetch label, group, product and zone layout for a device (best effort)."""
     try:
         _color, _power, device.label = await api.get_light_state(device)
     except (TimeoutError, NotImplementedError):
