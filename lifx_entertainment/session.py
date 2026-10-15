@@ -23,12 +23,9 @@ _KEEPALIVE_S = 1.0
 
 class EntertainmentSession:
     """
-    Asyncio facade that streams colours to every device of an entertainment area.
+    Stream colours to every device of an entertainment area.
 
-    On :meth:`start` the current state of each device is captured (and lights that are
-    off are switched on); frames pushed with :meth:`send` are converted to HSBK and sent
-    fire-and-forget over UDP; :meth:`stop` restores the captured state. LIFX devices need
-    no bridge, pairing or stream handshake, so a session is cheap to start and stop.
+    :meth:`start` captures each device's state, :meth:`stop` restores it.
     """
 
     def __init__(
@@ -46,12 +43,9 @@ class EntertainmentSession:
         """
         Initialize the session (no network I/O until :meth:`start`).
 
-        :param api: API bound to an opened transport.
-        :param area: The area to stream to.
         :param transition_ms: Fade time of each frame; smooths over frame jitter.
         :param power_on: Switch on devices that are off when the session starts.
         :param restore: Restore each device's previous state when the session stops.
-        :param restore_duration_ms: Fade time back to the previous state.
         :param kelvin: White point for low-saturation colours.
         :param max_rate_hz: Maximum messages per second sent to a single device.
         """
@@ -119,8 +113,6 @@ class EntertainmentSession:
         Push a frame of channel colours to the devices.
 
         Non-blocking and safe to call from the event loop; a no-op when not streaming.
-
-        :param commands: One color command per channel to update this frame.
         """
         if not self._streaming or not self._api.transport.is_open:
             return

@@ -1,12 +1,4 @@
-"""
-LIFX entertainment bridge — in-process Sendspin visualizer client.
-
-Each light area registers as an external Sendspin client whose bridge roles run
-the server's visualizer feature extraction on the group's audio and receive
-color palette updates directly — no WebSocket involved. The analyzer queues
-features by playback timestamp, converts them to light colors at render time,
-and streams them to the LIFX lights over the UDP LAN protocol.
-"""
+"""LIFX entertainment bridge: one in-process Sendspin visualizer client per light area."""
 
 from __future__ import annotations
 
@@ -67,12 +59,9 @@ LOGGER = logging.getLogger(__name__)
 # LIFX recommends at most 20 messages per second per device.
 _RENDER_RATE_HZ = 20
 _RENDER_PERIOD_S = 1.0 / _RENDER_RATE_HZ
-# Visualizer feature rate requested from the extraction pipeline. Bridge
-# filters (channel rise/decay, bass baseline) are tuned for ~20 Hz spectrum
-# input.
+# The analyzer's filters (channel rise/decay, bass baseline) are tuned for ~20 Hz input.
 _VISUALIZER_RATE_HZ = 20
 
-# Session start retries when lights are slow to answer the state snapshot.
 _SESSION_START_ATTEMPTS = 3
 _SESSION_START_BACKOFF_S = 1.0
 # Wait this long after a stream ends before restoring the lights: a new stream
@@ -81,13 +70,7 @@ _STOP_DEBOUNCE_S = 2.0
 
 
 class LifxEntertainmentBridge:
-    """
-    Manages the music sync for a single LIFX light area.
-
-    Registers with the local Sendspin server as an external visualizer
-    client, receives extracted visualization features keyed to playback
-    time, converts them to light colors, and streams to the LIFX lights.
-    """
+    """Music sync for a single LIFX light area."""
 
     def __init__(
         self,
@@ -124,19 +107,14 @@ class LifxEntertainmentBridge:
 
         client_id = f"lifx-{area_client_id(self.area.id, self.provider.instance_id)}"
 
-        # Register this client as a LIGHT player type with the Sendspin provider
-        # so the resulting player shows up correctly in the UI
         sendspin_prov: SendspinProvider | None = self.mass.get_provider("sendspin")  # type: ignore[assignment]
         if sendspin_prov:
             sendspin_prov.register_bridge_player_type(client_id, PlayerType.LIGHT)
 
         support = ClientHelloVisualizerSupport(
-            # Beat + small bundle of periodic features. Each periodic frame
-            # is ~20-30 bytes; one second's worth fits comfortably under
-            # the buffer cap below.
             buffer_capacity=2048,
             rate_max=_VISUALIZER_RATE_HZ,
-            # Peaks requested as a fallback for when beats aren't computed yet.
+            # Peaks drive the lights until the beat schedule has been computed.
             types=["beat", "peak", "spectrum"],
             spectrum=ClientHelloVisualizerSpectrum(
                 n_disp_bins=SPECTRUM_BINS,
@@ -174,8 +152,6 @@ class LifxEntertainmentBridge:
         if color_roles := self._sendspin_client.roles_by_family("color"):
             color_role = cast("BridgeColorRole", color_roles[0])
             color_role.set_callbacks(on_color=self._on_color)
-        # Subscribes the roles to the group's visualizer/color group roles,
-        # which beat schedules and palette updates flow through.
         self._sendspin_client.attach_preinitialized_roles()
 
         self.logger.info(
@@ -254,9 +230,8 @@ class LifxEntertainmentBridge:
             transition_ms=self._transition_ms,
             power_on=self._power_on,
         )
-        # The session is only handed off to self._session once it is streaming;
-        # until then it is closed in the finally so a failed - or cancelled -
-        # start never leaves the lights in a half-switched state.
+        # Until adopted, the finally closes the session so a failed or cancelled start
+        # never leaves the lights half switched on.
         adopted = False
         try:
             for attempt in range(_SESSION_START_ATTEMPTS):
@@ -309,8 +284,7 @@ class LifxEntertainmentBridge:
         )
 
     def _on_stream_start(self) -> None:
-        """Handle stream start — prepare the lights proactively."""
-        # Cancel any pending stop from a previous stream end (track transition)
+        """Prepare the lights and cancel a pending stop from the previous track."""
         if self._stop_debounce_task and not self._stop_debounce_task.done():
             self._stop_debounce_task.cancel()
             self._stop_debounce_task = None
@@ -320,10 +294,9 @@ class LifxEntertainmentBridge:
             self._start_task = self.mass.create_task(self._start_session())
 
     def _on_stream_end(self) -> None:
-        """Handle stream end — debounce to survive track transitions."""
-        # Also act while a start is still in flight: the stream can end before
-        # session.start() completes, and that late start would otherwise adopt a
-        # session that streams forever.
+        """Schedule a debounced stop, so track changes don't restore the lights."""
+        # Also while a start is in flight: it would otherwise adopt a session that
+        # streams forever.
         starting = self._start_task is not None and not self._start_task.done()
         if self._is_streaming or starting:
             if self._stop_debounce_task and not self._stop_debounce_task.done():
@@ -331,15 +304,13 @@ class LifxEntertainmentBridge:
             self._stop_debounce_task = self.mass.create_task(self._debounced_stop())
 
     def _on_stream_clear(self) -> None:
-        """Handle seek — queued analyzer state belongs to pre-seek audio, drop it."""
+        """Drop analyzer state queued before a seek."""
         if self._analyzer is not None:
             self._analyzer.clear_beats()
 
     async def _debounced_stop(self) -> None:
-        """Wait briefly before stopping — a new stream may start (track change)."""
+        """Stop after a short delay, unless a new stream started meanwhile."""
         await asyncio.sleep(_STOP_DEBOUNCE_S)
-        # Cancel a still-running start first (its finally closes the not-yet-adopted
-        # session); if the start already completed, tear the live session down.
         if self._start_task is not None and not self._start_task.done():
             self._start_task.cancel()
             with suppress(asyncio.CancelledError):
@@ -350,9 +321,7 @@ class LifxEntertainmentBridge:
 
     def _on_visualizer_frame(self, frame: ExtractedFrame) -> None:
         """Queue spectrum and onset-peak features for the renderer."""
-        # Frames arrive ahead of the playhead (in-process delivery follows the audio push);
-        # the analyzer queues them by timestamp and drains at render time. Gated so the
-        # queues only fill while the lights are up or coming up.
+        # Frames arrive ahead of the playhead; the analyzer queues them by timestamp.
         if self._analyzer is None or not (self._is_streaming or self._session_starting):
             return
         if frame.spectrum is not None:
@@ -362,9 +331,8 @@ class LifxEntertainmentBridge:
 
     def _on_beats(self, beats: list[BeatTiming]) -> None:
         """Append a beat schedule segment."""
-        # Not gated on streaming: the schedule lands once per track and may arrive while
-        # the lights are still being prepared; the renderer prunes past beats and track
-        # changes replace the schedule.
+        # Not gated on streaming: the schedule arrives once per track, possibly before
+        # the lights are ready.
         if self._analyzer is not None:
             self._analyzer.push_beats(beats)
 
@@ -456,7 +424,6 @@ class LifxEntertainmentBridgeManager:
             self.logger.warning("Sendspin provider not available, cannot set up LIFX bridges")
             return
 
-        # Remove bridges for areas that no longer exist
         current_ids = {area.id for area in areas}
         for area_id in list(self._bridges.keys()):
             if area_id not in current_ids:
