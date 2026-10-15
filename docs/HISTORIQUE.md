@@ -111,9 +111,10 @@ activé, broadcast `255.255.255.255`.
 ## 5. Pièges découverts (important)
 
 1. **Les dépendances des plugins ne s'installent pas automatiquement.** MA n'installe les
-   `requirements` du manifest que sous la forme `nom==version` depuis PyPI. La bibliothèque
-   n'est pas sur PyPI, d'où le script qui l'installe avec `uv pip install` depuis l'archive
-   GitHub.
+   `requirements` du manifest que sous la forme `nom==version` depuis PyPI. Avant la
+   publication sur PyPI (0.1.0, le 2026-10-15), le script installait donc la bibliothèque
+   avec `uv pip install` depuis l'archive GitHub. Le manifest épingle désormais
+   `lifx-entertainment==0.1.0`.
 2. **Le plugin disparaît quand le conteneur est recréé** : à chaque mise à jour de MA, et
    parfois au redémarrage. Il faut relancer le script, ou utiliser le mode `watch` dans les
    `init_commands` de l'add-on SSH (voir le README).
@@ -180,7 +181,8 @@ rapides.
 ## 8. Développement local
 
 - **Venv de travail** (hors dépôt) : `J:\Claude\_venvs\ma`, en Python 3.14. Il contient MA 2.10.6
-  installé depuis le tag git, aiosendspin, pytest, ruff et mypy.
+  installé depuis le tag git, aiosendspin, pytest, ruff et mypy. Sur le second PC, l'équivalent
+  est `F:\PERSO\_venvs\lifx` (MA 2.10.6 installé avec `--no-deps` et des dépendances réduites).
 - **Commandes** :
   ```sh
   pytest tests
@@ -188,7 +190,13 @@ rapides.
   mypy lifx_entertainment
   ```
 - **Clones de référence** (hors dépôt) : `J:\Claude\_ref` contient `hue-entertainment`,
-  `ma-2106` (serveur au tag 2.10.6) et `ma-server` (`main`).
+  `ma-2106` (serveur au tag 2.10.6) et `ma-server` (`main`). Sur le second PC, `F:\PERSO\_ref`
+  contient `hue-entertainment` et un clone partiel de `ma-server` (avec `AGENTS.md`).
+- **Fins de ligne** : `.gitattributes` impose LF, car le ruff de MA l'exige. Avec
+  `core.autocrlf=true`, la copie de travail reste en CRLF ; vérifier le contenu de l'index.
+- **Publier une version** : créer une release GitHub `vX.Y.Z`. Le workflow
+  `publish-to-pypi.yml` la publie sur PyPI (trusted publishing, environnement `pypi`) avec la
+  version tirée du tag. Penser ensuite à mettre à jour `requirements` dans le manifest.
 - **Quand MA est mis à jour** : comparer le provider Hue de la nouvelle version avec
   `bridge.py`, `setup_flow.py` et `provider.py`. Ce sont surtout l'API des rôles Sendspin
   (`ClientHelloVisualizerSupport`, `setup_visualizer`) et celle du parcours de configuration
@@ -196,10 +204,28 @@ rapides.
 
 ## 9. Idées pour la suite
 
-- Faire intégrer le plugin dans Music Assistant (PR sur `music-assistant/server`) et publier
-  la bibliothèque sur PyPI. Ce serait la seule façon d'éviter le script et la réinstallation
-  à chaque mise à jour.
+- Faire intégrer le plugin dans Music Assistant (PR sur `music-assistant/server`, en cours,
+  voir la section 10). Ce serait la seule façon d'éviter le script et la réinstallation à
+  chaque mise à jour.
 - Piloter les appareils matriciels (Tile, Candle, Ceiling) par zone, alors qu'ils n'ont
   aujourd'hui qu'une seule couleur.
 - Réintégrer automatiquement les lampes hors ligne au démarrage, alors qu'aujourd'hui elles
   sont ignorées jusqu'à la session suivante.
+
+## 10. Revue des mainteneurs MA (2026-10-15)
+
+La PR sur `music-assistant/server` (branche cible `dev`) a reçu trois demandes :
+
+1. **Publier la bibliothèque sur PyPI** et l'épingler dans le manifest, comme
+   `hue-entertainment`, puis expliquer dans la PR pourquoi aiolifx n'est pas utilisé.
+   Fait : `lifx-entertainment` 0.1.0 est sur PyPI. Le README contient la section « Why not
+   aiolifx? » : envois répétés 3 fois, un socket par lampe, API à callbacks, dépendances CLI.
+2. **Extraire `analyzer.py`** (copie de celui de Hue) dans un composant commun utilisé aussi
+   par Hue, sur le modèle de Telmore : `providers/music247e/` n'a pas de `manifest.json` et
+   Telmore en hérite. À faire dans le fork de MA.
+3. **Raccourcir commentaires et docstrings.** Fait (PR #1). Les `:param:` sont gardés là où
+   un paramètre mérite une explication, comme le veut `AGENTS.md` de MA. `analyzer.py` n'a
+   pas été touché pour rester identique à celui de Hue avant l'extraction.
+
+Règle de `AGENTS.md` : ne jamais répondre sur le GitHub de MA sans l'accord explicite de
+l'auteur.
