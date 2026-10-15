@@ -1,10 +1,4 @@
-"""
-Asyncio UDP transport for the LIFX LAN protocol.
-
-A single datagram endpoint is shared by discovery, state queries and colour streaming.
-Requests are matched to replies by ``(serial, sequence)``; fire-and-forget sends (the
-streaming path) never wait and never block the event loop.
-"""
+"""Asyncio UDP transport for the LIFX LAN protocol, shared by discovery and streaming."""
 
 from __future__ import annotations
 
@@ -97,11 +91,7 @@ class LifxTransport:
     """Shared UDP endpoint for talking to LIFX devices."""
 
     def __init__(self, source: int | None = None) -> None:
-        """
-        Initialize the transport (no socket is opened until :meth:`open`).
-
-        :param source: Client identifier stamped on every packet; random when omitted.
-        """
+        """Initialize the transport (no socket is opened until :meth:`open`)."""
         # 0 and 1 make devices broadcast their replies, so keep the source above that.
         self.source = source if source is not None else random.randint(2, 0xFFFFFFFF)  # noqa: S311
         self._transport: asyncio.DatagramTransport | None = None
@@ -115,11 +105,7 @@ class LifxTransport:
         return self._transport is not None and not self._transport.is_closing()
 
     async def open(self, local_addr: tuple[str, int] = ("0.0.0.0", 0)) -> None:  # noqa: S104
-        """
-        Open the UDP socket (idempotent).
-
-        :param local_addr: Local address to bind; an ephemeral port by default.
-        """
+        """Open the UDP socket (idempotent)."""
         if self.is_open:
             return
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
@@ -143,12 +129,7 @@ class LifxTransport:
         self._pending.clear()
 
     def add_listener(self, listener: PacketListener) -> Callable[[], None]:
-        """
-        Register a callback for every received packet (used by discovery).
-
-        :param listener: Callback receiving ``(header, payload, addr)``.
-        :return: A function that removes the listener again.
-        """
+        """Register a callback for every received packet (used by discovery)."""
         self._listeners.append(listener)
 
         def _remove() -> None:
@@ -168,18 +149,7 @@ class LifxTransport:
         res_required: bool = False,
         ack_required: bool = False,
     ) -> int:
-        """
-        Send a packet without waiting for anything (non-blocking).
-
-        :param host: Device IP or broadcast address.
-        :param msg_type: Message type number.
-        :param payload: Encoded payload.
-        :param target: 8-byte device target.
-        :param port: Destination UDP port.
-        :param res_required: Ask for a State reply.
-        :param ack_required: Ask for an Acknowledgement.
-        :return: The sequence number used.
-        """
+        """Send a packet without waiting for anything (non-blocking)."""
         if self._transport is None:
             msg = "LIFX transport is not open"
             raise RuntimeError(msg)
@@ -212,16 +182,9 @@ class LifxTransport:
         """
         Send a request to one device and wait for its reply (with retries).
 
-        :param host: Device IP.
-        :param target: 8-byte device target.
-        :param msg_type: Request message type.
-        :param payload: Encoded payload.
         :param response_types: Message types accepted as a reply.
-        :param port: Device UDP port.
         :param expected: Number of reply packets to collect (multi-packet responses).
-        :param timeout: Seconds to wait per attempt.
-        :param retries: Number of attempts before giving up.
-        :raises TimeoutError: When no (complete) reply arrived in any attempt.
+        :raises TimeoutError: When no reply arrived in any attempt.
         """
         serial = target[:6].hex()
         ack_only = response_types == (MessageType.ACKNOWLEDGEMENT,)

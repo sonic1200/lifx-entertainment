@@ -20,11 +20,7 @@ class LifxLanAPI:
     """Typed request/response wrapper around a :class:`LifxTransport`."""
 
     def __init__(self, transport: LifxTransport) -> None:
-        """
-        Initialize the API.
-
-        :param transport: An opened transport shared with discovery/streaming.
-        """
+        """Initialize the API."""
         self.transport = transport
 
     async def get_label(self, device: LifxDevice) -> str:
@@ -153,13 +149,7 @@ class LifxLanAPI:
     async def restore(
         self, device: LifxDevice, snapshot: DeviceSnapshot, duration_ms: int = 0
     ) -> None:
-        """
-        Restore a state captured by :meth:`snapshot`.
-
-        :param device: The device to restore.
-        :param snapshot: The captured state.
-        :param duration_ms: Fade time back to the captured state.
-        """
+        """Restore a state captured by :meth:`snapshot`."""
         if snapshot.zones and device.is_multizone:
             await self.set_zone_colors(device, list(snapshot.zones), duration_ms)
         else:
@@ -196,10 +186,6 @@ def zone_messages(
 
     Extended devices take up to 82 zones per message; legacy devices take one message per
     run of identical colours, applying everything with the last one.
-
-    :param device: The multizone device.
-    :param colors: One colour per zone.
-    :param duration_ms: Transition time.
     """
     if not colors:
         return []
