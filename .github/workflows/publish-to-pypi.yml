@@ -1,0 +1,59 @@
+# Publishes the library to PyPI when a GitHub release is published, versioned from its tag.
+
+name: Publish releases to PyPI
+
+on:
+  release:
+    types: [published, prereleased]
+
+jobs:
+  build-and-publish-pypi:
+    name: Builds and publishes releases to PyPI
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      # Trusted publishing: PyPI authenticates the workflow, no API token needed.
+      id-token: write
+    steps:
+      - name: Resolve version from the release
+        id: vars
+        env:
+          TAG: ${{ github.event.release.tag_name }}
+        run: |
+          version="${TAG#v}"
+          if [ -z "$version" ]; then
+            echo "::error::Could not resolve a release version from the event tag '${TAG}'"
+            exit 1
+          fi
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+      - name: Check out the released tag
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.release.tag_name }}
+      - name: Set up Python
+        uses: actions/setup-python@v6.2.0
+        with:
+          python-version: "3.13"
+      - name: Install build
+        run: pip install build tomli-w
+      - name: Set Python project version from tag
+        shell: python
+        env:
+          VERSION: ${{ steps.vars.outputs.version }}
+        run: |-
+          import os
+          import tomllib
+
+          import tomli_w
+
+          with open("pyproject.toml", "rb") as f:
+              pyproject = tomllib.load(f)
+
+          pyproject["project"]["version"] = os.environ["VERSION"]
+
+          with open("pyproject.toml", "wb") as f:
+              tomli_w.dump(pyproject, f)
+      - name: Build
+        run: python -m build
+      - name: Publish release to PyPI
+        uses: pypa/gh-action-pypi-publish@v1.13.0

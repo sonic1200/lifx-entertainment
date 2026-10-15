@@ -18,7 +18,8 @@ license = {text = "Apache-2.0"}
 name = "lifx-entertainment"
 readme = "README.md"
 requires-python = ">=3.11"
-version = "0.1.0"
+# The version is set by a GH action on release.
+version = "0.0.0"
 
 [project.optional-dependencies]
 test = [

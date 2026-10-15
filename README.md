@@ -96,6 +96,24 @@ init_commands:
 Light IP addresses are refreshed every 10 minutes, so DHCP changes are followed
 automatically.
 
+## Why not aiolifx?
+
+[aiolifx](https://github.com/aiolifx/aiolifx) is built for home automation (it powers
+Home Assistant's LIFX integration), not for streaming at 20 frames per second:
+
+- Its `fire_and_forget` repeats every packet 3 times, 50 ms apart, from a background task.
+  At 20 Hz that is three times LIFX's 20 messages/second budget, and stale frames are
+  replayed after newer ones.
+- It opens one UDP socket per light and runs a continuous discovery loop; this library uses
+  a single shared socket and only discovers on demand.
+- Its API is callback based, while the plugin needs awaitable requests for snapshot and
+  restore.
+- It pulls in CLI-only runtime dependencies (`click`, `InquirerPy`) plus `bitstring`; this
+  library depends on the standard library only.
+
+The streaming layer (snapshot/restore, rate limiting, duplicate-frame skipping) would have
+to be written on top of aiolifx anyway, so the protocol part is kept small and in-house.
+
 ## Limitations
 
 - LIFX bulbs are Wi-Fi devices: under heavy Wi-Fi load some frames may be late or lost.
