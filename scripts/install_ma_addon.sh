@@ -12,7 +12,10 @@
 # Options (environment variables):
 #   MA_CONTAINER  Music Assistant container (default: auto-detected *music_assistant* container)
 #   LIFX_REPO     GitHub "owner/name" of this repository
-#   LIFX_REF      Branch or tag to install (default: main)
+#   LIFX_REF      Branch or tag to install (default: the latest release)
+#
+# Only the provider is copied: Music Assistant installs the library itself, from PyPI, when
+# it loads the provider (the version pinned in the manifest's "requirements").
 #
 # The Home Assistant Supervisor re-creates the add-on container on every restart and
 # update, which drops the plugin again. Run the script with "watch" to keep it installed:
@@ -29,8 +32,7 @@ MODE="${1:-install}"
 WATCH_INTERVAL="${WATCH_INTERVAL:-60}"
 
 LIFX_REPO="${LIFX_REPO:-sonic1200/lifx-entertainment}"
-LIFX_REF="${LIFX_REF:-main}"
-ARCHIVE="https://github.com/${LIFX_REPO}/archive/${LIFX_REF}.tar.gz"
+LIFX_REF="${LIFX_REF:-}"
 
 find_container() {
   if [ -n "${MA_CONTAINER:-}" ]; then
@@ -44,7 +46,6 @@ is_installed() {
   docker exec "$1" /app/venv/bin/python -c '
 import sys, sysconfig
 from pathlib import Path
-import lifx_entertainment
 manifest = Path(sysconfig.get_path("purelib")) / "music_assistant/providers/lifx_entertainment/manifest.json"
 sys.exit(0 if manifest.is_file() else 1)
 ' >/dev/null 2>&1
@@ -74,14 +75,10 @@ if [ "${MODE}" = "check" ]; then
   fi
   exit 0
 fi
-echo "Installing LIFX Lights Sync (${LIFX_REPO}@${LIFX_REF}) into ${MA_CONTAINER}..."
+echo "Installing LIFX Lights Sync into ${MA_CONTAINER}..."
 
-# 1. The library, into Music Assistant's virtualenv.
-docker exec "${MA_CONTAINER}" sh -c \
-  "uv pip install --python /app/venv/bin/python --no-cache --reinstall '${ARCHIVE}'"
-
-# 2. The provider, into Music Assistant's providers directory.
-docker exec -i "${MA_CONTAINER}" /app/venv/bin/python - "${ARCHIVE}" <<'PY'
+# The provider, into Music Assistant's providers directory.
+docker exec -i "${MA_CONTAINER}" /app/venv/bin/python - "${LIFX_REPO}" "${LIFX_REF}" <<'PY'
 import io
 import json
 import shutil
@@ -91,7 +88,13 @@ import tarfile
 import urllib.request
 from pathlib import Path
 
-archive = sys.argv[1]
+repo, ref = sys.argv[1], sys.argv[2]
+if not ref:
+    latest = f"https://api.github.com/repos/{repo}/releases/latest"
+    with urllib.request.urlopen(latest, timeout=30) as response:  # noqa: S310
+        ref = json.load(response)["tag_name"]
+print(f"Using {repo}@{ref}")
+archive = f"https://github.com/{repo}/archive/{ref}.tar.gz"
 dest = Path(sysconfig.get_path("purelib")) / "music_assistant" / "providers" / "lifx_entertainment"
 marker = "/music_assistant_provider/lifx_entertainment/"
 with urllib.request.urlopen(archive, timeout=60) as response:  # noqa: S310
