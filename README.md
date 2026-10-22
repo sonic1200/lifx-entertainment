@@ -64,9 +64,11 @@ Assistant container. Tested with Music Assistant **2.10.6**.
    sh /config/lifx-entertainment/install_ma_addon.sh
    ```
 
-   The script installs the library into Music Assistant's virtualenv, copies the provider
-   into `music_assistant/providers/lifx_entertainment`, merges its strings (English and
-   French) into Music Assistant's translation files and restarts Music Assistant.
+   The script copies the provider of the latest release into
+   `music_assistant/providers/lifx_entertainment`, merges its strings (English and French)
+   into Music Assistant's translation files and restarts Music Assistant. Music Assistant
+   then installs the `lifx-entertainment` library from PyPI itself when it loads the plugin.
+   Set `LIFX_REF` to install another tag or branch (e.g. `LIFX_REF=main`).
 3. In Music Assistant: **Settings → Plugins → Add plugin → LIFX Lights Sync**, then pick the
    lights and the grouping.
 
