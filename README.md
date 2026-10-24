@@ -43,7 +43,7 @@ The repository contains two parts:
 
 `smooth`, `ambient`, `flashing` and `energetic`: the same modes as the Hue plugin, which
 follow the colours of the album art. Plus `party`: vivid colours from a fixed palette,
-hopping randomly every two beats with a fade, a different colour on each light, and a punchy
+hopping randomly every four beats with a long, eased fade, a different colour on each light, and a punchy
 pulse on the beat (stronger on downbeats). Every track gets its own random hue rotation.
 Brightness, colour mode, power-on behaviour and latency can be changed live from the
 plugin settings.

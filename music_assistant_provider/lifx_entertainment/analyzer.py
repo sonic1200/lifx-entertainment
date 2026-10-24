@@ -179,11 +179,11 @@ _MODES: dict[str, _ModePreset] = {
         channel_max=1.00,
     ),
     "party": _ModePreset(
-        # Vivid random colours from a fixed palette, hopping every 2 beats with a
-        # fade, a different colour per light, and a punchy pulse on the beat.
-        pulse_peak=1.5,
-        downbeat_pulse_peak=2.0,
-        beat_animation_fraction=0.5,
+        # Vivid random colours from a fixed palette, hopping every 4 beats with a
+        # long eased fade, a different colour per light, and a punchy pulse on the beat.
+        pulse_peak=1.3,
+        downbeat_pulse_peak=1.6,
+        beat_animation_fraction=0.6,
         channel_transient_scale=4.0,
         color_gradient_spread=1.0,
         palette_advance=1.0,
@@ -192,7 +192,7 @@ _MODES: dict[str, _ModePreset] = {
         channel_max=1.00,
         bass_saturation_scale=0.0,
         party=True,
-        party_beats_per_change=2,
+        party_beats_per_change=4,
     ),
 }
 
@@ -200,7 +200,7 @@ _MODES: dict[str, _ModePreset] = {
 # amount on every track so two tracks never look the same.
 _PARTY_HUES: tuple[float, ...] = (0.0, 0.07, 0.88, 0.76, 0.62, 0.5, 0.33)
 # Fraction of the gap to the peak-driven party position closed per render frame.
-_PARTY_PEAK_EASE = 0.25
+_PARTY_PEAK_EASE = 0.1
 
 # Brightness pulse on the beat. Triangle window with this half-width fraction
 # of the surrounding beat interval. ~8% of segment ≈ ±40 ms at 120 BPM. The
@@ -655,15 +655,16 @@ class LifxAudioAnalyzer:
         now_us: int,
         segment: int,
     ) -> list[tuple[float, float, float]]:
-        """Hold each colour for a few beats, then fade to the next one on the beat."""
+        """Hold each colour, then ease into the next one over the end of the step."""
         interval = max(1, self._mode.party_beats_per_change)
         step = prior.beat_in_bar // interval
+        t_norm = max(0.0, min(1.0, (now_us - prior.timestamp_us) / segment))
+        progress = (prior.beat_in_bar % interval + t_norm) / interval
+        hold_until = 1.0 - self._mode.beat_animation_fraction
         blend = 0.0
-        if next_beat.beat_in_bar // interval != step:
-            hold_until = 1.0 - self._mode.beat_animation_fraction
-            t_norm = max(0.0, min(1.0, (now_us - prior.timestamp_us) / segment))
-            if t_norm > hold_until:
-                blend = (t_norm - hold_until) / (1.0 - hold_until)
+        if progress > hold_until:
+            linear = min(1.0, (progress - hold_until) / (1.0 - hold_until))
+            blend = linear * linear * (3.0 - 2.0 * linear)  # smoothstep
         return [self._party_color(step + blend, i) for i in range(len(self._channels))]
 
     def _party_peak_colors(self) -> list[tuple[float, float, float]]:

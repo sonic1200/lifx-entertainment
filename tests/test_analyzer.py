@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib.util
+import itertools
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -141,3 +142,23 @@ def test_party_falls_back_to_peaks_without_beats(analyzer_module):
         analyzer.apply_peak(255, 1_000_000 + i * 200_000)
     after = [analyzer.render(1_000_000 + t * 50_000) for t in range(1, 40)][-1]
     assert [(c.red, c.green, c.blue) for c in before] != [(c.red, c.green, c.blue) for c in after]
+
+
+def test_party_fades_gradually(analyzer_module) -> None:
+    analyzer = _party(analyzer_module)
+    frames = _frames(analyzer, 1_000_000, 80)
+
+    def normalised(rgb: tuple[int, int, int]) -> tuple[float, ...]:
+        peak = max(rgb) or 1
+        return tuple(v / peak for v in rgb)
+
+    # Ignoring brightness (and the frames on a beat, where the pulse clips towards white),
+    # no light jumps colour within one 50 ms frame.
+    for index, (before, after) in enumerate(itertools.pairwise(frames)):
+        if index % 10 in (9, 0):
+            continue
+        for first, second in zip(before, after, strict=True):
+            step = max(
+                abs(a - b) for a, b in zip(normalised(first), normalised(second), strict=True)
+            )
+            assert step < 0.3
