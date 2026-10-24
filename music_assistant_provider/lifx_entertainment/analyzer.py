@@ -12,6 +12,7 @@ from __future__ import annotations
 import colorsys
 import itertools
 import math
+import random
 from collections import deque
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
@@ -117,6 +118,10 @@ class _ModePreset:
     # Scales the bass-driven saturation swing: 1.0 is the full swing, 0.0 holds
     # saturation at its floor (no bass reactivity).
     bass_saturation_scale: float = 1.0
+    # Party mode: ignore the album palette and hop randomly between vivid fixed
+    # colours, changing every ``party_beats_per_change`` beats.
+    party: bool = False
+    party_beats_per_change: int = 2
 
 
 # Modes selectable from the UI. ``DEFAULT_MODE`` is used when the configured
@@ -173,7 +178,29 @@ _MODES: dict[str, _ModePreset] = {
         channel_floor=0.30,
         channel_max=1.00,
     ),
+    "party": _ModePreset(
+        # Vivid random colours from a fixed palette, hopping every 2 beats with a
+        # fade, a different colour per light, and a punchy pulse on the beat.
+        pulse_peak=1.5,
+        downbeat_pulse_peak=2.0,
+        beat_animation_fraction=0.5,
+        channel_transient_scale=4.0,
+        color_gradient_spread=1.0,
+        palette_advance=1.0,
+        spatial_drift_per_second=0.0,
+        channel_floor=0.55,
+        channel_max=1.00,
+        bass_saturation_scale=0.0,
+        party=True,
+        party_beats_per_change=2,
+    ),
 }
+
+# Hues of the fixed party palette (fully saturated); they are rotated by a random
+# amount on every track so two tracks never look the same.
+_PARTY_HUES: tuple[float, ...] = (0.0, 0.07, 0.88, 0.76, 0.62, 0.5, 0.33)
+# Fraction of the gap to the peak-driven party position closed per render frame.
+_PARTY_PEAK_EASE = 0.25
 
 # Brightness pulse on the beat. Triangle window with this half-width fraction
 # of the surrounding beat interval. ~8% of segment ≈ ±40 ms at 120 BPM. The
@@ -271,9 +298,12 @@ class LifxAudioAnalyzer:
         channels: list[LightChannel],
         color_mode: str = DEFAULT_MODE,
         brightness: int = 100,
+        seed: int | None = None,
     ) -> None:
         """
         Initialize the analyzer.
+
+        ``seed`` makes the random colour choices of the party mode reproducible.
 
         ``color_mode`` selects a preset bundle from `_MODES` (defaults to
         `DEFAULT_MODE` when unknown); reactivity is governed by that preset.
@@ -321,6 +351,14 @@ class LifxAudioAnalyzer:
         # active; each consumed onset advances the position by one palette
         # advance step so colours scroll on onsets instead of holding static.
         self._peak_palette_position: float = 0.0
+
+        # Party mode: random colour sequence (palette indices), the hue rotation of the
+        # current track and the eased peak position used without a beat schedule.
+        self._rng = random.Random(seed)  # noqa: S311
+        self._party_sequence: list[int] = []
+        self._party_hue_shift = self._rng.random()
+        self._party_palette_cache: tuple[float, list[tuple[float, float, float]]] | None = None
+        self._party_peak_position: float = 0.0
 
         # Spatial layout — cached once because channel positions don't change
         # for the lifetime of an analyzer.
@@ -396,6 +434,9 @@ class LifxAudioAnalyzer:
         """Drop only the beat schedule (a track change re-pushes it; spectrum keeps flowing)."""
         self._beats.clear()
         self._last_beat_in_bar = -1
+        # New track: draw a fresh colour sequence and hue rotation.
+        self._party_sequence = []
+        self._party_hue_shift = self._rng.random()
 
     def clear_beats(self) -> None:
         """Drop the entire beat schedule + pending peaks (seek / stream end)."""
@@ -404,6 +445,7 @@ class LifxAudioAnalyzer:
         self._peak_boost = 0.0
         self._peak_set_at_us = None
         self._peak_palette_position = 0.0
+        self._party_peak_position = 0.0
         self._pending_spectrum.clear()
         self._spectrum = []
 
@@ -413,9 +455,9 @@ class LifxAudioAnalyzer:
         """Render every channel at server-clock time ``now_us``."""
         self._prune(now_us)
         self._advance_spectrum(now_us)
-        palette = self._active_palette()
         if not self._channels:
             return []
+        palette = [] if self._mode.party else self._active_palette()
         channel_mults = self._combined_channel_multipliers()
         # `_consume_peaks` always runs (it advances the peak palette walker);
         # `onset_boost` gates only the brightness flash, so ambient still cycles
@@ -430,11 +472,17 @@ class LifxAudioAnalyzer:
         # interpolate, so fall back to a peak-driven palette scroll.
         prior, next_beat, segment, _prior_bib = self._current_segment(now_us)
         if next_beat is None or segment is None or segment <= 0 or prior is None:
-            colors = self._peak_walk_colors(palette, now_us)
+            if self._mode.party:
+                colors = self._party_peak_colors()
+            else:
+                colors = self._peak_walk_colors(palette, now_us)
             return self._fill_per_channel(colors, base_brightness, channel_mults)
 
         pulse = self._compute_pulse(now_us, prior, next_beat, segment)
-        colors = self._per_channel_colors(palette, prior, next_beat, now_us, segment)
+        if self._mode.party:
+            colors = self._party_beat_colors(prior, next_beat, now_us, segment)
+        else:
+            colors = self._per_channel_colors(palette, prior, next_beat, now_us, segment)
         return self._fill_per_channel(colors, base_brightness * pulse, channel_mults)
 
     def _advance_spectrum(self, now_us: int) -> None:
@@ -567,6 +615,62 @@ class LifxAudioAnalyzer:
                 color = _scale_saturation(color, sat_factor)
             result.append(color)
         return result
+
+    def _party_palette(self) -> list[tuple[float, float, float]]:
+        """Return the fixed vivid palette, hue-rotated for the current track."""
+        shift = self._party_hue_shift
+        if self._party_palette_cache is None or self._party_palette_cache[0] != shift:
+            colors = [colorsys.hsv_to_rgb((hue + shift) % 1.0, 1.0, 1.0) for hue in _PARTY_HUES]
+            self._party_palette_cache = (shift, colors)
+        return self._party_palette_cache[1]
+
+    def _party_index(self, position: int) -> int:
+        """Palette index at ``position`` of the random sequence, extended on demand."""
+        size = len(_PARTY_HUES)
+        position = max(0, position)
+        while len(self._party_sequence) <= position:
+            if self._party_sequence:
+                previous = self._party_sequence[-1]
+                # Skip the previous colour and its two neighbours on the hue wheel.
+                choices = [
+                    i for i in range(size) if min((i - previous) % size, (previous - i) % size) > 1
+                ]
+            else:
+                choices = list(range(size))
+            self._party_sequence.append(self._rng.choice(choices))
+        return self._party_sequence[position]
+
+    def _party_color(self, step: float, channel_index: int) -> tuple[float, float, float]:
+        """Return a light's colour at a fractional step (neighbouring lights ripple)."""
+        palette = self._party_palette()
+        base = int(step) + channel_index
+        low = palette[self._party_index(base)]
+        high = palette[self._party_index(base + 1)]
+        return _lerp(low, high, step - int(step))
+
+    def _party_beat_colors(
+        self,
+        prior: _ScheduledBeat,
+        next_beat: _ScheduledBeat,
+        now_us: int,
+        segment: int,
+    ) -> list[tuple[float, float, float]]:
+        """Hold each colour for a few beats, then fade to the next one on the beat."""
+        interval = max(1, self._mode.party_beats_per_change)
+        step = prior.beat_in_bar // interval
+        blend = 0.0
+        if next_beat.beat_in_bar // interval != step:
+            hold_until = 1.0 - self._mode.beat_animation_fraction
+            t_norm = max(0.0, min(1.0, (now_us - prior.timestamp_us) / segment))
+            if t_norm > hold_until:
+                blend = (t_norm - hold_until) / (1.0 - hold_until)
+        return [self._party_color(step + blend, i) for i in range(len(self._channels))]
+
+    def _party_peak_colors(self) -> list[tuple[float, float, float]]:
+        """Without beats, hop on bass peaks, easing towards the new colour."""
+        target = self._peak_palette_position
+        self._party_peak_position += (target - self._party_peak_position) * _PARTY_PEAK_EASE
+        return [self._party_color(self._party_peak_position, i) for i in range(len(self._channels))]
 
     def _peak_walk_colors(
         self, palette: list[tuple[float, float, float]], now_us: int

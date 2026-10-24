@@ -16,7 +16,7 @@ CONF_TRANSITION_MS: Final[str] = "transition_ms"
 CONF_POWER_ON: Final[str] = "power_on"
 
 # First entry is the default.
-COLOR_MODES: Final[tuple[str, ...]] = ("smooth", "ambient", "flashing", "energetic")
+COLOR_MODES: Final[tuple[str, ...]] = ("smooth", "ambient", "flashing", "energetic", "party")
 DEFAULT_COLOR_MODE: Final[str] = COLOR_MODES[0]
 
 GROUPINGS: Final[tuple[str, ...]] = ("group", "all", "light")
