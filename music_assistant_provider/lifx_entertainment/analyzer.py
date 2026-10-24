@@ -179,11 +179,11 @@ _MODES: dict[str, _ModePreset] = {
         channel_max=1.00,
     ),
     "party": _ModePreset(
-        # Vivid random colours from a fixed palette, hopping every 4 beats with a
+        # Vivid random colours from a fixed palette, hopping every 8 beats with a
         # long eased fade, a different colour per light, and a punchy pulse on the beat.
-        pulse_peak=1.3,
-        downbeat_pulse_peak=1.6,
-        beat_animation_fraction=0.6,
+        pulse_peak=1.2,
+        downbeat_pulse_peak=1.45,
+        beat_animation_fraction=0.7,
         channel_transient_scale=4.0,
         color_gradient_spread=1.0,
         palette_advance=1.0,
@@ -192,13 +192,26 @@ _MODES: dict[str, _ModePreset] = {
         channel_max=1.00,
         bass_saturation_scale=0.0,
         party=True,
-        party_beats_per_change=4,
+        party_beats_per_change=8,
     ),
 }
 
 # Hues of the fixed party palette (fully saturated); they are rotated by a random
 # amount on every track so two tracks never look the same.
-_PARTY_HUES: tuple[float, ...] = (0.0, 0.07, 0.88, 0.76, 0.62, 0.5, 0.33)
+_PARTY_HUES: tuple[float, ...] = (
+    0.0,
+    0.07,
+    0.15,
+    0.25,
+    0.33,
+    0.42,
+    0.5,
+    0.56,
+    0.62,
+    0.7,
+    0.76,
+    0.88,
+)
 # Fraction of the gap to the peak-driven party position closed per render frame.
 _PARTY_PEAK_EASE = 0.1
 
